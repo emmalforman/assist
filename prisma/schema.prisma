@@ -1,0 +1,203 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// ─── EVENTS ────────────────────────────────────────────────
+model Event {
+  id          String   @id @default(cuid())
+  name        String                          // e.g. "Women in Robotics", "Member Meetup"
+  status      String   @default("not_started") // not_started, planning, inviting, complete, did_not_do
+  audience    String   @default("all_members") // all_members, invite_only, external
+  date        DateTime?
+  lumaUrl     String?
+  planningDoc String?                         // link to planning doc
+  photosUrl   String?                         // link to photo album
+  nextSteps   String?                         // free-text notes
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  venueId   String?
+  venue     Venue?   @relation(fields: [venueId], references: [id])
+  guests    EventGuest[]
+  sponsors  EventSponsor[]
+  tickets   TicketTier[]
+  menus     Menu[]
+  campaigns OutreachCampaign[]
+}
+
+// ─── VENUES / SPACES ──────────────────────────────────────
+model Venue {
+  id        String   @id @default(cuid())
+  name      String                           // e.g. "Maxwell", "Biondivino", "Soft Bar"
+  address   String?
+  city      String?
+  capacity  Int?
+  contactName  String?
+  contactEmail String?
+  contactPhone String?
+  notes     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  events Event[]
+}
+
+// ─── CONTACTS (the lead / guest database) ─────────────────
+model Contact {
+  id         String   @id @default(cuid())
+  firstName  String
+  lastName   String?
+  email      String?  @unique
+  phone      String?
+  company    String?
+  role       String?                         // job title
+  linkedinUrl String?
+  source     String?                         // how they were found: linkedin, gmail, referral, manual
+  tags       String?                         // comma-separated: "food-tech, investor, sf"
+  leadScore  Int      @default(0)            // 0-100 scoring
+  notes      String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  eventGuests EventGuest[]
+  outreachMessages OutreachMessage[]
+}
+
+// ─── EVENT ↔ GUEST (join table with RSVP + attendance) ────
+model EventGuest {
+  id             String   @id @default(cuid())
+  rsvpStatus     String   @default("pending") // pending, invited, confirmed, declined, waitlisted
+  attended       Boolean  @default(false)
+  checkedInAt    DateTime?
+  dietaryNeeds   String?                      // vegetarian, vegan, gf, allergies
+  plusOnes       Int      @default(0)
+  notes          String?
+  createdAt      DateTime @default(now())
+
+  eventId   String
+  event     Event   @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  contactId String
+  contact   Contact @relation(fields: [contactId], references: [id], onDelete: Cascade)
+
+  @@unique([eventId, contactId])
+}
+
+// ─── SPONSORS ─────────────────────────────────────────────
+model Sponsor {
+  id           String   @id @default(cuid())
+  name         String                        // e.g. "Verve", "JPMorgan", "DoorDash"
+  tier         String?                       // gold, silver, bronze, partner
+  contactName  String?
+  contactEmail String?
+  logoUrl      String?
+  notes        String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  events       EventSponsor[]
+}
+
+model EventSponsor {
+  id            String   @id @default(cuid())
+  commitment    String?                      // what they're providing: cash, product, venue
+  amount        Float?                       // dollar value if applicable
+  deliverables  String?                      // "logo on page, speaking slot, booth"
+  status        String   @default("pending") // pending, confirmed, delivered
+  createdAt     DateTime @default(now())
+
+  eventId   String
+  event     Event   @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  sponsorId String
+  sponsor   Sponsor @relation(fields: [sponsorId], references: [id], onDelete: Cascade)
+
+  @@unique([eventId, sponsorId])
+}
+
+// ─── TICKETS & PRICING ───────────────────────────────────
+model TicketTier {
+  id            String   @id @default(cuid())
+  name          String                       // "Free", "GA", "VIP"
+  price         Float    @default(0)
+  currency      String   @default("usd")
+  capacity      Int?
+  sold          Int      @default(0)
+  stripeProductId String?
+  stripePriceId   String?
+  createdAt     DateTime @default(now())
+
+  eventId String
+  event   Event  @relation(fields: [eventId], references: [id], onDelete: Cascade)
+}
+
+// ─── FOOD & MENUS ─────────────────────────────────────────
+model Menu {
+  id        String     @id @default(cuid())
+  name      String                           // "Main Menu", "Dessert"
+  notes     String?
+  createdAt DateTime   @default(now())
+
+  eventId String
+  event   Event  @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  items   MenuItem[]
+}
+
+model MenuItem {
+  id          String  @id @default(cuid())
+  name        String                         // "Grilled Salmon"
+  description String?
+  category    String?                        // appetizer, main, dessert, drink
+  dietaryTags String?                        // vegan, gf, nut-free
+  quantity    Int?
+
+  menuId String
+  menu   Menu   @relation(fields: [menuId], references: [id], onDelete: Cascade)
+}
+
+// ─── OUTREACH ENGINE (the proprietary layer) ─────────────
+model OutreachCampaign {
+  id        String   @id @default(cuid())
+  name      String                           // "Women in Robotics Invite Wave 1"
+  type      String   @default("invite")      // invite, reminder, follow_up, post_event
+  status    String   @default("draft")       // draft, active, paused, complete
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  eventId  String
+  event    Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  messages OutreachMessage[]
+  templates OutreachTemplate[]
+}
+
+model OutreachTemplate {
+  id         String @id @default(cuid())
+  subject    String
+  body       String                          // supports {{firstName}}, {{eventName}}, etc.
+  stepOrder  Int    @default(1)              // 1=initial invite, 2=reminder, 3=last chance
+  delayDays  Int    @default(0)             // days after previous step
+
+  campaignId String
+  campaign   OutreachCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+}
+
+model OutreachMessage {
+  id         String   @id @default(cuid())
+  subject    String?
+  body       String?
+  channel    String   @default("email")      // email, linkedin, sms
+  status     String   @default("pending")    // pending, sent, opened, replied, bounced
+  sentAt     DateTime?
+  openedAt   DateTime?
+  repliedAt  DateTime?
+  createdAt  DateTime @default(now())
+
+  campaignId String
+  campaign   OutreachCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  contactId  String
+  contact    Contact @relation(fields: [contactId], references: [id], onDelete: Cascade)
+}
