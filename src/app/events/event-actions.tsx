@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { advanceEventStatus } from "@/lib/actions";
 
 const statusFlow: Record<string, string> = {
   not_started: "planning",
@@ -14,14 +15,12 @@ export function EventActions({ eventId, currentStatus }: { eventId: string; curr
   const [loading, setLoading] = useState(false);
   const nextStatus = statusFlow[currentStatus];
 
-  async function advanceStatus() {
+  async function handleAdvance(e: React.MouseEvent) {
+    e.preventDefault();
+    e.stopPropagation();
     if (!nextStatus) return;
     setLoading(true);
-    await fetch(`/api/events/${eventId}/status`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ status: nextStatus }),
-    });
+    await advanceEventStatus(eventId, nextStatus);
     router.refresh();
     setLoading(false);
   }
@@ -30,7 +29,7 @@ export function EventActions({ eventId, currentStatus }: { eventId: string; curr
 
   return (
     <button
-      onClick={advanceStatus}
+      onClick={handleAdvance}
       disabled={loading}
       className="text-xs bg-accent/10 text-accent font-medium px-3 py-1.5 rounded-lg hover:bg-accent/20 transition-colors disabled:opacity-50"
     >

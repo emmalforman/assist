@@ -37,12 +37,20 @@ export default async function ContactsPage() {
             {contacts.length} contacts in your network
           </p>
         </div>
-        <Link
-          href="/contacts/new"
-          className="bg-accent text-white text-sm font-medium px-4 py-2.5 rounded-lg hover:bg-accent-light transition-colors"
-        >
-          + Add Contact
-        </Link>
+        <div className="flex gap-2">
+          <Link
+            href="/contacts/import"
+            className="text-sm font-medium px-4 py-2.5 rounded-lg border border-border text-zinc-700 hover:bg-zinc-50 transition-colors"
+          >
+            Import CSV
+          </Link>
+          <Link
+            href="/contacts/new"
+            className="bg-accent text-white text-sm font-medium px-4 py-2.5 rounded-lg hover:bg-accent-light transition-colors"
+          >
+            + Add Contact
+          </Link>
+        </div>
       </div>
 
       <div className="bg-card-bg border border-border rounded-xl overflow-hidden">

@@ -63,7 +63,7 @@ export default async function OutreachPage() {
       ) : (
         <div className="bg-card-bg border border-border rounded-xl divide-y divide-border">
           {campaigns.map((campaign) => (
-            <div key={campaign.id} className="px-6 py-4 flex items-center justify-between">
+            <a key={campaign.id} href={`/outreach/${campaign.id}`} className="px-6 py-4 flex items-center justify-between hover:bg-zinc-50/50 transition-colors block">
               <div>
                 <div className="flex items-center gap-2">
                   <p className="text-sm font-semibold text-zinc-900">{campaign.name}</p>
@@ -76,7 +76,7 @@ export default async function OutreachPage() {
                 </p>
               </div>
               <span className="text-xs bg-zinc-100 text-zinc-600 px-2 py-1 rounded">{campaign.type}</span>
-            </div>
+            </a>
           ))}
         </div>
       )}

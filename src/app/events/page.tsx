@@ -72,7 +72,7 @@ export default async function EventsPage() {
               </div>
               <div className="bg-card-bg border border-border rounded-xl divide-y divide-border">
                 {group.map((event) => (
-                  <div key={event.id} className="px-6 py-4 flex items-center justify-between">
+                  <a key={event.id} href={`/events/${event.id}`} className="px-6 py-4 flex items-center justify-between hover:bg-zinc-50/50 transition-colors block">
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-3">
                         <p className="text-sm font-semibold text-zinc-900 truncate">{event.name}</p>
@@ -102,7 +102,7 @@ export default async function EventsPage() {
                       )}
                       <EventActions eventId={event.id} currentStatus={event.status} />
                     </div>
-                  </div>
+                  </a>
                 ))}
               </div>
             </div>
