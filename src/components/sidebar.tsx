@@ -5,7 +5,9 @@ import { usePathname } from "next/navigation";
 
 const nav = [
   { href: "/", label: "Dashboard", icon: "grid" },
+  { href: "/inbox", label: "Inbox", icon: "inbox" },
   { href: "/events", label: "Events", icon: "calendar" },
+  { href: "/jobs", label: "Jobs", icon: "briefcase" },
   { href: "/contacts", label: "Contacts", icon: "users" },
   { href: "/venues", label: "Venues", icon: "map-pin" },
   { href: "/sponsors", label: "Sponsors", icon: "star" },
@@ -42,6 +44,16 @@ const icons: Record<string, React.ReactNode> = {
   send: (
     <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
       <path strokeLinecap="round" strokeLinejoin="round" d="M6 12 3.269 3.125A59.769 59.769 0 0 1 21.485 12 59.768 59.768 0 0 1 3.27 20.875L5.999 12Zm0 0h7.5" />
+    </svg>
+  ),
+  inbox: (
+    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 13.5h3.86a2.25 2.25 0 0 1 2.012 1.244l.256.512a2.25 2.25 0 0 0 2.013 1.244h3.218a2.25 2.25 0 0 0 2.013-1.244l.256-.512a2.25 2.25 0 0 1 2.013-1.244h3.859m-19.5.338V18a2.25 2.25 0 0 0 2.25 2.25h15A2.25 2.25 0 0 0 21.75 18v-4.162c0-.224-.034-.447-.1-.661L19.24 5.338a2.25 2.25 0 0 0-2.15-1.588H6.911a2.25 2.25 0 0 0-2.15 1.588L2.35 13.177a2.25 2.25 0 0 0-.1.661Z" />
+    </svg>
+  ),
+  briefcase: (
+    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M20.25 14.15v4.075a3 3 0 0 1-3 3H6.75a3 3 0 0 1-3-3V14.15M12 15.75h.008v.008H12v-.008ZM15 11.25h1.5a2.25 2.25 0 0 1 2.25 2.25v.75a2.25 2.25 0 0 1-2.25 2.25H7.5a2.25 2.25 0 0 1-2.25-2.25v-.75a2.25 2.25 0 0 1 2.25-2.25H9m6 0V9a2.25 2.25 0 0 0-2.25-2.25h-1.5A2.25 2.25 0 0 0 9 9v2.25m6 0H9" />
     </svg>
   ),
 };

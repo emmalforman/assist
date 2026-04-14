@@ -201,3 +201,38 @@ model OutreachMessage {
   contactId  String
   contact    Contact @relation(fields: [contactId], references: [id], onDelete: Cascade)
 }
+
+// ─── JOBS / OPPORTUNITIES ─────────────────────────────────
+model Job {
+  id          String   @id @default(cuid())
+  title       String                           // "Head of Growth"
+  company     String?                          // "Acme"
+  description String?                          // full details
+  location    String?                          // remote, SF, NYC
+  salary      String?                          // "$150k-200k" (string for flexibility)
+  applyUrl    String?                          // link to apply
+  contactName String?                          // referral contact
+  contactEmail String?
+  source      String?                          // email, manual, slack
+  status      String   @default("open")        // open, filled, archived
+  tags        String?                          // "full-time,senior,product"
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+// ─── EMAIL INTAKE (from emma@mycacollective.com) ─────────
+model InboxItem {
+  id           String   @id @default(cuid())
+  messageId    String?  @unique                // Gmail message ID (for dedup)
+  fromEmail    String
+  fromName     String?
+  subject      String
+  body         String
+  intent       String                          // event | job | unknown
+  status       String   @default("pending")    // pending, approved, rejected
+  parsedData   String?                         // JSON blob of extracted fields
+  createdEventId String?                       // if approved as event
+  createdJobId   String?                       // if approved as job
+  receivedAt   DateTime @default(now())
+  processedAt  DateTime?
+}

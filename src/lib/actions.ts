@@ -280,3 +280,115 @@ export async function checkInGuest(eventGuestId: string) {
   });
   revalidatePath("/events");
 }
+
+// ─── Approve inbox item → create event or job ──────────
+export async function approveInboxItem(inboxItemId: string) {
+  const item = await prisma.inboxItem.findUnique({ where: { id: inboxItemId } });
+  if (!item || !item.parsedData) return { error: "Cannot approve — no parsed data" };
+
+  const parsed = JSON.parse(item.parsedData);
+
+  if (item.intent === "event") {
+    // Find or create venue if name was extracted
+    let venueId: string | null = null;
+    if (parsed.venue) {
+      const existingVenue = await prisma.venue.findFirst({
+        where: { name: { equals: parsed.venue } },
+      });
+      if (existingVenue) {
+        venueId = existingVenue.id;
+      } else {
+        const newVenue = await prisma.venue.create({ data: { name: parsed.venue } });
+        venueId = newVenue.id;
+      }
+    }
+
+    const event = await prisma.event.create({
+      data: {
+        name: parsed.name,
+        status: "not_started",
+        audience: "all_members",
+        date: parsed.date ? new Date(parsed.date) : null,
+        venueId,
+        nextSteps: `Imported from email: ${item.fromName || item.fromEmail}\n\n${parsed.description || ""}`,
+      },
+    });
+
+    await prisma.inboxItem.update({
+      where: { id: inboxItemId },
+      data: { status: "approved", processedAt: new Date(), createdEventId: event.id },
+    });
+
+    // Also create contact for sender if not exists
+    if (parsed.sourceContact?.email) {
+      const existing = await prisma.contact.findUnique({
+        where: { email: parsed.sourceContact.email },
+      });
+      if (!existing) {
+        const [firstName, ...rest] = (parsed.sourceContact.name || item.fromEmail).split(" ");
+        await prisma.contact.create({
+          data: {
+            firstName: firstName || "Unknown",
+            lastName: rest.join(" ") || null,
+            email: parsed.sourceContact.email,
+            source: "email_intake",
+          },
+        });
+      }
+    }
+
+    revalidatePath("/inbox");
+    revalidatePath("/events");
+    return { success: true, eventId: event.id };
+  }
+
+  if (item.intent === "job") {
+    const job = await prisma.job.create({
+      data: {
+        title: parsed.title,
+        company: parsed.company || null,
+        description: parsed.description || null,
+        location: parsed.location || null,
+        salary: parsed.salary || null,
+        applyUrl: parsed.applyUrl || null,
+        contactName: parsed.sourceContact?.name || item.fromName,
+        contactEmail: parsed.sourceContact?.email || item.fromEmail,
+        source: "email",
+        status: "open",
+      },
+    });
+
+    await prisma.inboxItem.update({
+      where: { id: inboxItemId },
+      data: { status: "approved", processedAt: new Date(), createdJobId: job.id },
+    });
+
+    revalidatePath("/inbox");
+    revalidatePath("/jobs");
+    return { success: true, jobId: job.id };
+  }
+
+  return { error: "Unknown intent" };
+}
+
+export async function rejectInboxItem(inboxItemId: string) {
+  await prisma.inboxItem.update({
+    where: { id: inboxItemId },
+    data: { status: "rejected", processedAt: new Date() },
+  });
+  revalidatePath("/inbox");
+}
+
+// ─── Manually paste email for processing ──────────────
+export async function ingestEmailManual(from: string, subject: string, body: string) {
+  const res = await fetch(
+    `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/api/inbox/ingest`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ from, subject, body }),
+    }
+  );
+  revalidatePath("/inbox");
+  return await res.json();
+}
