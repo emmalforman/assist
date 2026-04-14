@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/db";
+import { getAdminEmails } from "@/lib/admin";
 import { InboxActions } from "./inbox-actions";
 import { PasteEmailForm } from "./paste-form";
 
@@ -21,6 +22,7 @@ export default async function InboxPage() {
   });
 
   const pending = items.filter((i) => i.status === "pending");
+  const adminEmails = getAdminEmails();
 
   return (
     <>
@@ -29,6 +31,15 @@ export default async function InboxPage() {
         <p className="text-sm text-muted mt-1">
           Email <span className="font-mono text-accent">emma@mycacollective.com</span> with &ldquo;event&rdquo; or &ldquo;job&rdquo;
           in the subject line — it&apos;ll show up here for one-click approval.
+        </p>
+        <p className="text-xs text-muted mt-2">
+          Auto-approved senders:{" "}
+          {adminEmails.map((e, i) => (
+            <span key={e}>
+              <span className="font-mono text-accent">{e}</span>
+              {i < adminEmails.length - 1 && ", "}
+            </span>
+          ))}
         </p>
       </div>
 
@@ -82,6 +93,7 @@ export default async function InboxPage() {
         <div className="space-y-3">
           {items.map((item) => {
             const parsed = item.parsedData ? JSON.parse(item.parsedData) : null;
+            const isAdminSubmission = adminEmails.includes(item.fromEmail.toLowerCase());
             return (
               <div key={item.id} className="bg-card-bg border border-border rounded-xl p-5">
                 <div className="flex items-start justify-between mb-3">
@@ -93,6 +105,11 @@ export default async function InboxPage() {
                       <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${statusColors[item.status]}`}>
                         {item.status}
                       </span>
+                      {isAdminSubmission && item.status === "approved" && (
+                        <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-violet-100 text-violet-700">
+                          auto-approved (admin)
+                        </span>
+                      )}
                       <span className="text-xs text-muted">
                         {item.receivedAt.toLocaleDateString()}
                       </span>

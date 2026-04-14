@@ -1,5 +1,7 @@
 import { prisma } from "@/lib/db";
 import { parseEmail, EmailPayload } from "@/lib/email-parser";
+import { isAdminEmail } from "@/lib/admin";
+import { approveInboxItem } from "@/lib/actions";
 import { NextRequest, NextResponse } from "next/server";
 
 // Email webhook endpoint.
@@ -14,6 +16,10 @@ import { NextRequest, NextResponse } from "next/server";
 //   "subject": "Event: Member Meetup at Moonrise",
 //   "body": "Let's do a meetup on May 3rd..."
 // }
+//
+// If the sender's email matches an admin (configured via ADMIN_EMAILS env var,
+// defaults to emma@mycacollective.com) the item is auto-approved and the
+// event/job is created immediately.
 
 export async function POST(request: NextRequest) {
   try {
@@ -52,6 +58,20 @@ export async function POST(request: NextRequest) {
         parsedData: data ? JSON.stringify(data) : null,
       },
     });
+
+    // Auto-approve if sender is admin AND we successfully parsed intent
+    if (intent !== "unknown" && isAdminEmail(fromEmail)) {
+      const result = await approveInboxItem(item.id);
+      return NextResponse.json(
+        {
+          status: "auto_approved",
+          id: item.id,
+          intent,
+          ...result,
+        },
+        { status: 201 }
+      );
+    }
 
     return NextResponse.json({ status: "received", id: item.id, intent }, { status: 201 });
   } catch (error) {
