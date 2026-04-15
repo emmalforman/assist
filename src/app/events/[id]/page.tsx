@@ -61,6 +61,11 @@ export default async function EventDetailPage({ params }: { params: Promise<{ id
             <span className={`text-xs font-medium px-2.5 py-1 rounded-full ${statusColors[event.status]}`}>
               {event.status.replace(/_/g, " ")}
             </span>
+            {event.city && (
+              <span className="text-xs font-medium px-2.5 py-1 rounded-full bg-violet-50 text-violet-700">
+                {event.city}
+              </span>
+            )}
           </div>
           <div className="flex items-center gap-3 text-sm text-muted">
             {event.date && (

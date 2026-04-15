@@ -13,15 +13,24 @@ export async function createEventFromTemplate(formData: FormData) {
   const date = formData.get("date") as string;
   const venueId = formData.get("venueId") as string;
   const customName = formData.get("name") as string;
+  const cityInput = formData.get("city") as string;
 
   const template = EVENT_TEMPLATES[templateKey];
   if (!template) throw new Error("Invalid template");
+
+  // Auto-fill city from venue when not explicitly set
+  let city: string | null = cityInput || null;
+  if (!city && venueId) {
+    const venue = await prisma.venue.findUnique({ where: { id: venueId } });
+    city = venue?.city || null;
+  }
 
   const event = await prisma.event.create({
     data: {
       name: customName || template.name,
       status: "planning",
       audience: template.audience,
+      city,
       date: date ? new Date(date) : null,
       venueId: venueId || null,
       nextSteps: template.defaultNotes,

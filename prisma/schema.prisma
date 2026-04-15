@@ -13,6 +13,7 @@ model Event {
   name        String                          // e.g. "Women in Robotics", "Member Meetup"
   status      String   @default("not_started") // not_started, planning, inviting, complete, did_not_do
   audience    String   @default("all_members") // all_members, invite_only, external
+  city        String?                         // "San Francisco", "New York", "Los Angeles"
   date        DateTime?
   lumaUrl     String?
   planningDoc String?                         // link to planning doc
