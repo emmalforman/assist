@@ -10,6 +10,7 @@ function formatDate(d: Date | null) {
 const rsvpColors: Record<string, string> = {
   pending: "bg-zinc-100 text-zinc-600",
   invited: "bg-blue-100 text-blue-700",
+  saved: "bg-amber-100 text-amber-800",
   confirmed: "bg-emerald-100 text-emerald-700",
   declined: "bg-red-100 text-red-700",
   waitlisted: "bg-amber-100 text-amber-700",
@@ -76,7 +77,13 @@ export default async function MyEventsPage({
 
   const now = new Date();
   const upcoming = contact.eventGuests.filter(
-    (g) => g.event.date && g.event.date >= now
+    (g) =>
+      g.event.date &&
+      g.event.date >= now &&
+      (g.rsvpStatus === "confirmed" || g.rsvpStatus === "invited")
+  );
+  const saved = contact.eventGuests.filter(
+    (g) => g.rsvpStatus === "saved" && (!g.event.date || g.event.date >= now)
   );
   const past = contact.eventGuests.filter(
     (g) => !g.event.date || g.event.date < now
@@ -150,11 +157,15 @@ export default async function MyEventsPage({
           Hi {contact.firstName} 👋
         </h1>
         <p className="text-sm text-muted">
-          {contact.eventGuests.length} event{contact.eventGuests.length === 1 ? "" : "s"} saved
+          {upcoming.length > 0 && <>{upcoming.length} going · </>}
+          {saved.length > 0 && <>{saved.length} saved · </>}
+          {past.length > 0 && <>{past.length} past</>}
+          {upcoming.length === 0 && saved.length === 0 && past.length === 0 && "No events yet"}
         </p>
       </div>
 
-      {renderGroup("Upcoming", upcoming)}
+      {renderGroup("Going ✓", upcoming)}
+      {renderGroup("Saved ★", saved)}
       {renderGroup("Past", past)}
 
       {contact.eventGuests.length === 0 && (

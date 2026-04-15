@@ -112,12 +112,20 @@ export default async function PublicEventPage({
       {/* RSVP form */}
       <div className="bg-card-bg border border-border rounded-2xl p-6 mb-6">
         <h2 className="text-lg font-semibold text-zinc-900 mb-1">
-          {currentGuest?.rsvpStatus === "confirmed" ? "You're in 🎉" : "Are you going?"}
+          {currentGuest?.rsvpStatus === "confirmed"
+            ? "You're in 🎉"
+            : currentGuest?.rsvpStatus === "saved"
+            ? "Saved for later ★"
+            : currentGuest?.rsvpStatus === "declined"
+            ? "Not this time"
+            : "Interested?"}
         </h2>
         <p className="text-sm text-muted mb-4">
           {currentGuest?.rsvpStatus === "confirmed"
-            ? "We'll see you there. Update your RSVP below if anything changes."
-            : "Save your spot in under 10 seconds."}
+            ? "We'll see you there. Update your status below if anything changes."
+            : currentGuest?.rsvpStatus === "saved"
+            ? "This is on your personal list. Mark yourself as going when you're ready."
+            : "Save it for later or commit right now — your call."}
         </p>
         <RsvpForm
           eventId={event.id}

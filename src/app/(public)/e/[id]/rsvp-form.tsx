@@ -3,6 +3,8 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
+type RsvpStatus = "saved" | "confirmed" | "declined";
+
 type DefaultValues = {
   firstName: string;
   lastName: string;
@@ -19,12 +21,14 @@ export function RsvpForm({
   defaultValues?: DefaultValues;
 }) {
   const router = useRouter();
-  const [saving, setSaving] = useState(false);
-  const [saved, setSaved] = useState(defaultValues?.rsvpStatus === "confirmed");
+  const [loading, setLoading] = useState<RsvpStatus | null>(null);
+  const [currentStatus, setCurrentStatus] = useState<string | null>(
+    defaultValues?.rsvpStatus || null
+  );
   const [error, setError] = useState<string | null>(null);
 
-  async function submit(status: "confirmed" | "declined") {
-    setSaving(true);
+  async function submit(status: RsvpStatus) {
+    setLoading(status);
     setError(null);
     const form = document.getElementById("rsvp-form") as HTMLFormElement;
     const formData = new FormData(form);
@@ -45,19 +49,17 @@ export function RsvpForm({
     const data = await res.json();
     if (!res.ok) {
       setError(data.error || "Something went wrong");
-      setSaving(false);
+      setLoading(null);
       return;
     }
 
-    setSaved(status === "confirmed");
-    // Persist member identity for /my page and re-renders
+    setCurrentStatus(status);
     if (typeof window !== "undefined" && data.email) {
       localStorage.setItem("myca.email", data.email);
     }
-    // Refresh to update the guest list + pre-fill
     router.replace(`/e/${eventId}?email=${encodeURIComponent(String(formData.get("email") || ""))}`);
     router.refresh();
-    setSaving(false);
+    setLoading(null);
   }
 
   return (
@@ -94,28 +96,57 @@ export function RsvpForm({
 
       {error && <p className="text-xs text-red-600">{error}</p>}
 
-      <div className="flex flex-col sm:flex-row gap-2 pt-2">
+      <div className="grid grid-cols-3 gap-2 pt-2">
+        <button
+          type="button"
+          onClick={() => submit("saved")}
+          disabled={loading !== null}
+          className={`text-sm font-semibold py-3 rounded-lg transition-colors disabled:opacity-50 flex items-center justify-center gap-1.5 ${
+            currentStatus === "saved"
+              ? "bg-amber-100 text-amber-800 border border-amber-200"
+              : "bg-zinc-100 text-zinc-700 hover:bg-zinc-200"
+          }`}
+        >
+          {loading === "saved" ? "..." : currentStatus === "saved" ? "★ Saved" : "☆ Save"}
+        </button>
         <button
           type="button"
           onClick={() => submit("confirmed")}
-          disabled={saving}
-          className="flex-1 bg-accent text-white text-sm font-semibold py-3 rounded-lg hover:bg-accent-light transition-colors disabled:opacity-50"
+          disabled={loading !== null}
+          className={`text-sm font-semibold py-3 rounded-lg transition-colors disabled:opacity-50 ${
+            currentStatus === "confirmed"
+              ? "bg-emerald-600 text-white"
+              : "bg-accent text-white hover:bg-accent-light"
+          }`}
         >
-          {saving ? "Saving..." : saved ? "✓ You're going — save again" : "I'm going"}
+          {loading === "confirmed"
+            ? "..."
+            : currentStatus === "confirmed"
+            ? "✓ You're going"
+            : "I'm going"}
         </button>
         <button
           type="button"
           onClick={() => submit("declined")}
-          disabled={saving}
-          className="text-sm text-muted border border-border px-5 py-3 rounded-lg hover:bg-zinc-50 transition-colors disabled:opacity-50"
+          disabled={loading !== null}
+          className={`text-sm font-semibold py-3 rounded-lg border transition-colors disabled:opacity-50 ${
+            currentStatus === "declined"
+              ? "bg-red-50 text-red-700 border-red-200"
+              : "text-muted border-border hover:bg-zinc-50"
+          }`}
         >
-          Can&apos;t make it
+          {loading === "declined" ? "..." : currentStatus === "declined" ? "✓ Declined" : "Can't make it"}
         </button>
       </div>
 
-      {saved && (
+      <p className="text-xs text-muted pt-1">
+        <strong className="text-zinc-700">Save</strong> bookmarks it privately for later.{" "}
+        <strong className="text-zinc-700">I&apos;m going</strong> adds you to the public guest list.
+      </p>
+
+      {(currentStatus === "saved" || currentStatus === "confirmed") && (
         <p className="text-xs text-emerald-600 pt-1">
-          Saved. See all your upcoming events at{" "}
+          See all your events at{" "}
           <a
             href={`/my?email=${encodeURIComponent(defaultValues?.email || "")}`}
             className="underline font-medium"

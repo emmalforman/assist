@@ -47,6 +47,7 @@ export default async function EventDetailPage({ params }: { params: Promise<{ id
   const availableContacts = allContacts.filter((c) => !assignedContactIds.has(c.id));
 
   const confirmedCount = event.guests.filter((g) => g.rsvpStatus === "confirmed").length;
+  const savedCount = event.guests.filter((g) => g.rsvpStatus === "saved").length;
   const invitedCount = event.guests.filter((g) => g.rsvpStatus === "invited").length;
   const pendingCount = event.guests.filter((g) => g.rsvpStatus === "pending").length;
   const sentMessages = event.campaigns.reduce((sum, c) => sum + c._count.messages, 0);
@@ -79,7 +80,7 @@ export default async function EventDetailPage({ params }: { params: Promise<{ id
       </div>
 
       {/* Quick stats */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-8">
+      <div className="grid grid-cols-2 md:grid-cols-6 gap-3 mb-8">
         <div className="bg-card-bg border border-border rounded-xl p-3">
           <p className="text-xs text-muted">Total Guests</p>
           <p className="text-xl font-bold text-zinc-900">{event.guests.length}</p>
@@ -87,6 +88,10 @@ export default async function EventDetailPage({ params }: { params: Promise<{ id
         <div className="bg-card-bg border border-border rounded-xl p-3">
           <p className="text-xs text-muted">Confirmed</p>
           <p className="text-xl font-bold text-emerald-600">{confirmedCount}</p>
+        </div>
+        <div className="bg-card-bg border border-border rounded-xl p-3">
+          <p className="text-xs text-muted">★ Saved</p>
+          <p className="text-xl font-bold text-amber-600">{savedCount}</p>
         </div>
         <div className="bg-card-bg border border-border rounded-xl p-3">
           <p className="text-xs text-muted">Invited</p>

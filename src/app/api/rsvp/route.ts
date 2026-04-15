@@ -52,7 +52,8 @@ export async function POST(request: NextRequest) {
       where: { eventId_contactId: { eventId, contactId: contact.id } },
     });
 
-    const rsvpStatus = status === "declined" ? "declined" : "confirmed";
+    const validStatuses = ["saved", "confirmed", "declined"];
+    const rsvpStatus = validStatuses.includes(status) ? status : "confirmed";
 
     if (existing) {
       await prisma.eventGuest.update({

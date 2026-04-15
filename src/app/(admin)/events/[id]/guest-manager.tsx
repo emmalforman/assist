@@ -195,6 +195,7 @@ export function GuestManager({
                     >
                       <option value="pending">Pending</option>
                       <option value="invited">Invited</option>
+                      <option value="saved">★ Saved</option>
                       <option value="confirmed">Confirmed</option>
                       <option value="declined">Declined</option>
                       <option value="waitlisted">Waitlisted</option>
