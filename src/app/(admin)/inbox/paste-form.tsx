@@ -5,12 +5,29 @@ import { useState } from "react";
 
 type Mode = "url" | "email";
 
+// Platforms that block automated page fetching — prompt the user for the
+// caption/description so we can still extract date and venue.
+const SCRAPE_BLOCKED_HOSTS = ["instagram.com", "tiktok.com", "facebook.com", "twitter.com", "x.com"];
+
+function needsManualCaption(url: string): string | null {
+  try {
+    const host = new URL(url).hostname.toLowerCase().replace(/^www\./, "");
+    const matched = SCRAPE_BLOCKED_HOSTS.find((h) => host === h || host.endsWith("." + h));
+    return matched || null;
+  } catch {
+    return null;
+  }
+}
+
 export function PasteEmailForm() {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [mode, setMode] = useState<Mode>("url");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [urlInput, setUrlInput] = useState("");
+
+  const blockedHost = needsManualCaption(urlInput);
 
   async function handleUrlSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -18,12 +35,13 @@ export function PasteEmailForm() {
     setError(null);
     const form = new FormData(e.currentTarget);
     const url = String(form.get("url") || "").trim();
+    const description = String(form.get("description") || "").trim();
 
     try {
       const res = await fetch("/api/inbox/ingest-url", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ url }),
+        body: JSON.stringify({ url, description: description || undefined }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -110,13 +128,40 @@ export function PasteEmailForm() {
           <input
             name="url"
             type="url"
-            placeholder="https://resy.com/... or lu.ma/... or eventbrite.com/e/..."
+            value={urlInput}
+            onChange={(e) => setUrlInput(e.target.value)}
+            placeholder="https://resy.com/... or lu.ma/... or instagram.com/p/..."
             required
             className="w-full border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent/50"
           />
-          <p className="text-xs text-muted">
-            Supported: Resy, Luma, Eventbrite, Partiful, Posh. Admin paste auto-creates the event.
-          </p>
+
+          {blockedHost ? (
+            <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-xs text-amber-900 space-y-1">
+              <p className="font-semibold">
+                {blockedHost.charAt(0).toUpperCase() + blockedHost.slice(1)} blocks automated scraping.
+              </p>
+              <p>
+                Paste the caption or description below so we can pull out the date, venue, and details.
+              </p>
+            </div>
+          ) : (
+            <p className="text-xs text-muted">
+              Full auto-parse: Resy, Luma, Eventbrite, Partiful, Posh. Other URLs are fetched for OG tags.
+              Optionally paste a description below to help extraction.
+            </p>
+          )}
+
+          <textarea
+            name="description"
+            rows={blockedHost ? 5 : 3}
+            placeholder={
+              blockedHost
+                ? "Paste the caption here — e.g. 'Join us May 15 at Moonrise Bagel for our Member Meetup...'"
+                : "Optional description or event details..."
+            }
+            className="w-full border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent/50"
+          />
+
           {error && <p className="text-xs text-red-600">{error}</p>}
           <button
             type="submit"

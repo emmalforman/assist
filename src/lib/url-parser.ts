@@ -7,7 +7,9 @@ export type ParsedUrlEvent = {
   venue?: string;
   city?: string;
   url: string;
-  platform: string;    // "resy" | "luma" | "eventbrite" | "partiful" | "posh" | "generic"
+  platform: string;    // "resy" | "luma" | "eventbrite" | "partiful" | "posh" | "instagram" | "tiktok" | "generic"
+  description?: string;
+  image?: string;
 };
 
 // Common city-slug → display name mapping.
@@ -34,14 +36,18 @@ const CITY_SLUGS: Record<string, string> = {
   "london": "London",
 };
 
+const STOP_WORDS = new Set(["a", "an", "and", "at", "by", "for", "in", "of", "on", "or", "the", "to", "vs", "x"]);
+const ACRONYMS = new Set(["ai", "ml", "cpg", "dc", "la", "ny", "nyc", "sf", "uk", "us", "vip"]);
+
 // Turn a slug like "make-food-not-waste-dining-series" into Title Case.
 function slugToTitle(slug: string): string {
-  return slug
-    .split(/[-_]/)
-    .filter(Boolean)
-    .map((word) => {
-      if (word.length <= 2 && /^[a-z]+$/i.test(word)) return word.toUpperCase();
-      return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
+  const words = slug.split(/[-_]/).filter(Boolean);
+  return words
+    .map((word, i) => {
+      const lower = word.toLowerCase();
+      if (ACRONYMS.has(lower)) return lower.toUpperCase();
+      if (i > 0 && STOP_WORDS.has(lower)) return lower;
+      return lower.charAt(0).toUpperCase() + lower.slice(1);
     })
     .join(" ");
 }
@@ -57,14 +63,19 @@ function normalizeCity(slug: string): string | undefined {
 }
 
 // ─── Resy ─────────────────────────────────────────────────
-// https://resy.com/cities/{city-slug}/venues/{venue-slug}?date=YYYY-MM-DD
+// Two URL shapes:
+//   a) https://resy.com/cities/{city}/venues/{venue}?date=YYYY-MM-DD
+//   b) https://resy.com/cities/{city}/venues/{venue}/events/{event-slug}-YYYY-MM-DD?date=YYYY-MM-DD
 function parseResy(url: URL): ParsedUrlEvent | null {
   const parts = url.pathname.split("/").filter(Boolean);
   const citiesIdx = parts.indexOf("cities");
   const venuesIdx = parts.indexOf("venues");
+  const eventsIdx = parts.indexOf("events");
 
   let city: string | undefined;
   let venue: string | undefined;
+  let name: string | undefined;
+  let date: string | undefined;
 
   if (citiesIdx !== -1 && parts[citiesIdx + 1]) {
     city = normalizeCity(parts[citiesIdx + 1]);
@@ -73,13 +84,30 @@ function parseResy(url: URL): ParsedUrlEvent | null {
     venue = slugToTitle(parts[venuesIdx + 1]);
   }
 
-  const dateParam = url.searchParams.get("date");
-  const date = dateParam && /^\d{4}-\d{2}-\d{2}$/.test(dateParam) ? dateParam : undefined;
+  if (eventsIdx !== -1 && parts[eventsIdx + 1]) {
+    const eventSlug = parts[eventsIdx + 1];
+    // Date is typically appended as "-YYYY-MM-DD" at the end of the slug.
+    const trailingDate = eventSlug.match(/-(\d{4}-\d{2}-\d{2})$/);
+    if (trailingDate) {
+      date = trailingDate[1];
+      name = slugToTitle(eventSlug.replace(/-\d{4}-\d{2}-\d{2}$/, ""));
+    } else {
+      name = slugToTitle(eventSlug);
+    }
+  } else {
+    name = venue;
+  }
 
-  if (!venue) return null;
+  // Query-string date wins only if we didn't extract one from the slug.
+  if (!date) {
+    const dateParam = url.searchParams.get("date");
+    if (dateParam && /^\d{4}-\d{2}-\d{2}$/.test(dateParam)) date = dateParam;
+  }
+
+  if (!venue && !name) return null;
 
   return {
-    name: venue,
+    name: name || venue || "Resy Event",
     date,
     venue,
     city,
@@ -149,6 +177,33 @@ function parsePosh(url: URL): ParsedUrlEvent | null {
   };
 }
 
+// ─── Instagram ────────────────────────────────────────────
+// https://www.instagram.com/p/{shortcode}/
+// https://www.instagram.com/reel/{shortcode}/
+// URL alone only gives us the shortcode — we rely on OG scraping for content.
+function parseInstagram(url: URL): ParsedUrlEvent | null {
+  const parts = url.pathname.split("/").filter(Boolean);
+  const kind = parts[0]; // "p" (post), "reel", "tv"
+  const shortcode = parts[1];
+  if (!shortcode) return null;
+
+  const label = kind === "reel" ? "Reel" : kind === "tv" ? "IGTV" : "Post";
+  return {
+    name: `Instagram ${label}`,
+    url: url.toString(),
+    platform: "instagram",
+  };
+}
+
+// ─── TikTok ──────────────────────────────────────────────
+function parseTikTok(url: URL): ParsedUrlEvent | null {
+  return {
+    name: "TikTok Post",
+    url: url.toString(),
+    platform: "tiktok",
+  };
+}
+
 // ─── Main entry point ─────────────────────────────────────
 export function parseEventUrl(rawUrl: string): ParsedUrlEvent | null {
   let url: URL;
@@ -165,10 +220,19 @@ export function parseEventUrl(rawUrl: string): ParsedUrlEvent | null {
   if (host.endsWith("eventbrite.com")) return parseEventbrite(url);
   if (host === "partiful.com") return parsePartiful(url);
   if (host === "posh.vip") return parsePosh(url);
+  if (host === "instagram.com") return parseInstagram(url);
+  if (host === "tiktok.com") return parseTikTok(url);
 
   // Generic fallback — pull last path segment as a guess at the event name.
   const parts = url.pathname.split("/").filter(Boolean);
-  if (parts.length === 0) return null;
+  if (parts.length === 0) {
+    // Bare host — still return something so OG enrichment can take over.
+    return {
+      name: host,
+      url: url.toString(),
+      platform: "generic",
+    };
+  }
   const lastSlug = parts[parts.length - 1];
   return {
     name: slugToTitle(lastSlug),
@@ -181,4 +245,54 @@ export function parseEventUrl(rawUrl: string): ParsedUrlEvent | null {
 export function extractUrls(text: string): string[] {
   const matches = text.match(/https?:\/\/[^\s<>"]+/g);
   return matches ? Array.from(new Set(matches)) : [];
+}
+
+// Async, server-side enrichment. Combines URL-based parsing (for known
+// platforms like Resy) with fetched OpenGraph / meta tags (for platforms
+// where structured data lives on the page, like Instagram, blog posts).
+//
+// Always prefer URL-parsed data when present (it's more reliable than
+// HTML scraping), and fall back to OG tags for anything missing.
+export async function parseEventUrlEnriched(
+  rawUrl: string
+): Promise<(ParsedUrlEvent & { image?: string }) | null> {
+  const base = parseEventUrl(rawUrl);
+  if (!base) return null;
+
+  // Platforms where URL alone provides enough data — skip scraping.
+  const skipScrape = new Set(["resy", "eventbrite"]);
+  if (skipScrape.has(base.platform)) return base;
+
+  // Dynamic import so the heavier dependency stays out of client bundles.
+  const { fetchOgTags, extractDateFromText } = await import("@/lib/og-scraper");
+  const og = await fetchOgTags(rawUrl);
+  if (!og) return base;
+
+  // Clean up titles like "Sarah Chen on Instagram: "Join us on May 15…""
+  let enrichedName = base.name;
+  let description = og.description;
+
+  if (og.title) {
+    const m = og.title.match(/^(.+?)\s+on\s+(Instagram|TikTok):\s*["""](.+?)["""]/i);
+    if (m) {
+      enrichedName = m[3].length > 80 ? m[3].slice(0, 80) + "..." : m[3];
+      if (!description) description = m[3];
+    } else if (base.platform !== "luma" || enrichedName.startsWith("Luma Event")) {
+      enrichedName = og.title.length > 100 ? og.title.slice(0, 100) + "..." : og.title;
+    }
+  }
+
+  // Try to extract a date from description if URL didn't give us one.
+  const date =
+    base.date ||
+    (description ? extractDateFromText(description) : undefined) ||
+    (og.title ? extractDateFromText(og.title) : undefined);
+
+  return {
+    ...base,
+    name: enrichedName || base.name,
+    date,
+    description,
+    image: og.image,
+  } as ParsedUrlEvent & { image?: string; description?: string };
 }

@@ -93,12 +93,22 @@ function extractDate(text: string): string | undefined {
   return undefined;
 }
 
-// Extract simple "key: value" style fields from body
+// Extract simple "key: value" style fields from body.
+// Matches both at line start ("Venue: X") and mid-sentence ("... .Venue: X.").
 function extractField(body: string, keys: string[]): string | undefined {
   for (const key of keys) {
-    const regex = new RegExp(`^\\s*${key}\\s*[:：]\\s*(.+)$`, "im");
-    const match = body.match(regex);
-    if (match) return match[1].trim();
+    // Try line-anchored match first (cleanest case).
+    const lineRegex = new RegExp(`^\\s*${key}\\s*[:：]\\s*(.+)$`, "im");
+    const lineMatch = body.match(lineRegex);
+    if (lineMatch) {
+      return lineMatch[1].split(/[.\n]/)[0].trim();
+    }
+    // Fall back to mid-sentence — require the key to be preceded by a
+    // delimiter (start, whitespace, period, comma) so we don't match
+    // substrings like "avenue:" inside other words.
+    const midRegex = new RegExp(`(?:^|[\\s.,;])${key}\\s*[:：]\\s*([^.\\n;]+)`, "i");
+    const midMatch = body.match(midRegex);
+    if (midMatch) return midMatch[1].trim();
   }
   return undefined;
 }
