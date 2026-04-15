@@ -1,6 +1,8 @@
 // Parse incoming emails to extract event or job details.
 // Triggered by subject line keywords: "event" or "job".
 
+import { extractUrls, parseEventUrl, ParsedUrlEvent } from "@/lib/url-parser";
+
 export type EmailPayload = {
   messageId?: string;
   from: string;          // "Sender Name <sender@example.com>" or just email
@@ -14,6 +16,9 @@ export type ParsedEvent = {
   name: string;
   date?: string;         // ISO date if extractable
   venue?: string;
+  city?: string;
+  url?: string;
+  platform?: string;
   description?: string;
   sourceContact: { name?: string; email?: string };
 };
@@ -28,12 +33,32 @@ export type ParsedJob = {
   sourceContact: { name?: string; email?: string };
 };
 
-export function detectIntent(subject: string): ParsedIntent {
+export function detectIntent(subject: string, body: string = ""): ParsedIntent {
   const s = subject.toLowerCase();
   // Check for job first (more specific), then event
   if (/\b(job|hiring|role|position|opening|opportunity)\b/.test(s)) return "job";
   if (/\b(event|dinner|meetup|pitch|popup|pop-up|workshop|panel|summit)\b/.test(s)) return "event";
+  // Fall back to URL detection — if the body contains a known event-platform
+  // URL (Resy, Luma, Eventbrite, etc.), treat it as an event.
+  for (const url of extractUrls(body)) {
+    const parsed = parseEventUrl(url);
+    if (parsed && parsed.platform !== "generic") return "event";
+  }
   return "unknown";
+}
+
+// Scan the body text for URLs and return the first one that parses as a
+// known event platform, plus any generic fallbacks.
+function findBestEventUrl(body: string): ParsedUrlEvent | null {
+  const urls = extractUrls(body);
+  let generic: ParsedUrlEvent | null = null;
+  for (const url of urls) {
+    const parsed = parseEventUrl(url);
+    if (!parsed) continue;
+    if (parsed.platform !== "generic") return parsed;
+    generic = generic ?? parsed;
+  }
+  return generic;
 }
 
 // Extract "Name <email@...>" format
@@ -88,15 +113,29 @@ export function parseEventEmail(payload: EmailPayload): ParsedEvent {
   const { subject, body } = payload;
   const sourceContact = parseFrom(payload.from);
 
-  // Remove the word "event" from the subject to get a cleaner name
+  // Try to enrich from any event-platform URLs in the body first.
+  const urlEvent = findBestEventUrl(body);
+
+  // Remove the word "event" from the subject to get a cleaner name.
   let name = subject.replace(/\b(event|invite|invitation)\b/gi, "").replace(/[:\-–—]+/g, " ").trim();
+  if (!name && urlEvent?.name) name = urlEvent.name;
   if (!name) name = "Untitled Event";
 
-  const date = extractDate(subject) || extractDate(body);
-  const venue = extractField(body, ["venue", "location", "where", "place"]);
+  const date = extractDate(subject) || extractDate(body) || urlEvent?.date;
+  const venue = extractField(body, ["venue", "location", "where", "place"]) || urlEvent?.venue;
+  const city = extractField(body, ["city"]) || urlEvent?.city;
   const description = body.length > 500 ? body.slice(0, 500) + "..." : body;
 
-  return { name, date, venue, description, sourceContact };
+  return {
+    name,
+    date,
+    venue,
+    city,
+    url: urlEvent?.url,
+    platform: urlEvent?.platform,
+    description,
+    sourceContact,
+  };
 }
 
 export function parseJobEmail(payload: EmailPayload): ParsedJob {
@@ -130,8 +169,19 @@ export function parseEmail(payload: EmailPayload): {
   intent: ParsedIntent;
   data: ParsedEvent | ParsedJob | null;
 } {
-  const intent = detectIntent(payload.subject);
+  const intent = detectIntent(payload.subject, payload.body);
   if (intent === "event") return { intent, data: parseEventEmail(payload) };
   if (intent === "job") return { intent, data: parseJobEmail(payload) };
   return { intent, data: null };
+}
+
+// Build an email payload from a bare URL. Used by the "paste URL" flow.
+export function emailPayloadFromUrl(rawUrl: string, fromEmail: string): EmailPayload | null {
+  const parsed = parseEventUrl(rawUrl);
+  if (!parsed) return null;
+  return {
+    from: fromEmail,
+    subject: `Event: ${parsed.name}`,
+    body: rawUrl,
+  };
 }

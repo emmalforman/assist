@@ -306,20 +306,45 @@ export async function approveInboxItem(inboxItemId: string) {
       });
       if (existingVenue) {
         venueId = existingVenue.id;
+        // If the existing venue doesn't have a city yet but the parsed URL
+        // tells us one, fill it in.
+        if (!existingVenue.city && parsed.city) {
+          await prisma.venue.update({
+            where: { id: existingVenue.id },
+            data: { city: parsed.city },
+          });
+        }
       } else {
-        const newVenue = await prisma.venue.create({ data: { name: parsed.venue } });
+        const newVenue = await prisma.venue.create({
+          data: { name: parsed.venue, city: parsed.city || null },
+        });
         venueId = newVenue.id;
       }
     }
+
+    // Luma URLs go in lumaUrl; other event-platform URLs go in planningDoc as a
+    // link we can open to review.
+    const isLumaUrl = parsed.platform === "luma";
+    const notePieces = [
+      `Imported from: ${item.fromName || item.fromEmail}`,
+      parsed.platform && parsed.platform !== "generic"
+        ? `Source: ${parsed.platform}`
+        : null,
+      parsed.url && !isLumaUrl ? `Link: ${parsed.url}` : null,
+      parsed.description,
+    ].filter(Boolean);
 
     const event = await prisma.event.create({
       data: {
         name: parsed.name,
         status: "not_started",
         audience: "all_members",
+        city: parsed.city || null,
         date: parsed.date ? new Date(parsed.date) : null,
         venueId,
-        nextSteps: `Imported from email: ${item.fromName || item.fromEmail}\n\n${parsed.description || ""}`,
+        lumaUrl: isLumaUrl ? parsed.url : null,
+        planningDoc: !isLumaUrl ? parsed.url || null : null,
+        nextSteps: notePieces.join("\n\n"),
       },
     });
 
