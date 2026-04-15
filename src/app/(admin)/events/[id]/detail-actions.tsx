@@ -37,8 +37,23 @@ export function EventDetailActions({
     complete: "Done",
   };
 
+  async function copyPublicLink() {
+    const url = `${window.location.origin}/e/${eventId}`;
+    await navigator.clipboard.writeText(url);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  }
+
+  const [copied, setCopied] = useState(false);
+
   return (
     <div className="flex items-center gap-2">
+      <button
+        onClick={copyPublicLink}
+        className="text-xs border border-border px-3 py-2 rounded-lg text-muted hover:bg-zinc-50 transition-colors"
+      >
+        {copied ? "✓ Copied" : "Copy RSVP Link"}
+      </button>
       {lumaUrl && (
         <a
           href={lumaUrl}
