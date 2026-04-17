@@ -11,12 +11,18 @@ import { revalidatePath } from "next/cache";
 export async function createEventFromTemplate(formData: FormData) {
   const templateKey = formData.get("template") as string;
   const date = formData.get("date") as string;
+  const time = formData.get("time") as string;
   const venueId = formData.get("venueId") as string;
   const customName = formData.get("name") as string;
   const cityInput = formData.get("city") as string;
 
   const template = EVENT_TEMPLATES[templateKey];
   if (!template) throw new Error("Invalid template");
+  if (!date) throw new Error("Date is required");
+  if (!venueId) throw new Error("Venue is required");
+
+  // Combine date + time
+  const eventDate = time ? new Date(`${date}T${time}`) : new Date(date);
 
   // Auto-fill city from venue when not explicitly set
   let city: string | null = cityInput || null;
@@ -24,6 +30,7 @@ export async function createEventFromTemplate(formData: FormData) {
     const venue = await prisma.venue.findUnique({ where: { id: venueId } });
     city = venue?.city || null;
   }
+  if (!city) throw new Error("City is required");
 
   const event = await prisma.event.create({
     data: {
@@ -31,8 +38,8 @@ export async function createEventFromTemplate(formData: FormData) {
       status: "planning",
       audience: template.audience,
       city,
-      date: date ? new Date(date) : null,
-      venueId: venueId || null,
+      date: eventDate,
+      venueId,
       nextSteps: template.defaultNotes,
     },
   });
