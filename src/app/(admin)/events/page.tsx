@@ -24,9 +24,9 @@ function formatDate(d: Date | null) {
 export default async function EventsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ city?: string }>;
+  searchParams: Promise<{ city?: string; past?: string }>;
 }) {
-  const { city: selectedCity } = await searchParams;
+  const { city: selectedCity, past: showPast } = await searchParams;
 
   // Build list of all distinct cities (with counts) for the filter bar
   const cityGroups = await prisma.event.groupBy({
@@ -41,9 +41,18 @@ export default async function EventsPage({
 
   const totalCount = cityGroups.reduce((sum, g) => sum + g._count.city, 0);
 
-  // Apply city filter to event query
+  // Default: only show today + future events. ?past=1 shows everything.
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const includePast = showPast === "1";
+
   const events = await prisma.event.findMany({
-    where: selectedCity ? { city: selectedCity } : undefined,
+    where: {
+      ...(selectedCity ? { city: selectedCity } : {}),
+      ...(!includePast
+        ? { OR: [{ date: { gte: today } }, { date: null }] }
+        : {}),
+    },
     orderBy: [{ date: "asc" }],
     include: {
       venue: true,
@@ -68,12 +77,20 @@ export default async function EventsPage({
             {events.length} {selectedCity ? `events in ${selectedCity}` : "events across your pipeline"}
           </p>
         </div>
-        <Link
-          href="/events/new"
-          className="bg-accent text-white text-sm font-medium px-4 py-2.5 rounded-lg hover:bg-accent-light transition-colors"
-        >
-          + New Event
-        </Link>
+        <div className="flex items-center gap-3">
+          <Link
+            href={includePast ? `/events${selectedCity ? `?city=${encodeURIComponent(selectedCity)}` : ""}` : `/events?past=1${selectedCity ? `&city=${encodeURIComponent(selectedCity)}` : ""}`}
+            className="text-xs text-muted border border-border px-3 py-2 rounded-lg hover:bg-zinc-50 transition-colors"
+          >
+            {includePast ? "Hide past" : "Show past"}
+          </Link>
+          <Link
+            href="/events/new"
+            className="bg-accent text-white text-sm font-medium px-4 py-2.5 rounded-lg hover:bg-accent-light transition-colors"
+          >
+            + New Event
+          </Link>
+        </div>
       </div>
 
       {/* City filter pills */}
