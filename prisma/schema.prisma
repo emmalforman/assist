@@ -237,3 +237,28 @@ model InboxItem {
   receivedAt   DateTime @default(now())
   processedAt  DateTime?
 }
+
+// ─── CALENDAR FEED SYNC (Luma, Partiful, Google Calendar) ─
+model CalendarFeed {
+  id          String   @id @default(cuid())
+  name        String                           // "My Luma", "Google Cal", "Partiful"
+  url         String   @unique                 // iCal feed URL
+  platform    String   @default("ical")        // luma, partiful, gcal, ical (generic)
+  enabled     Boolean  @default(true)
+  lastSyncAt  DateTime?
+  lastError   String?
+  eventCount  Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+// ─── SYNCED EVENT IDS (maps external UIDs to local events for dedup) ─
+model SyncedEvent {
+  id          String   @id @default(cuid())
+  externalUid String                           // VEVENT UID from the ICS feed
+  feedId      String                           // which CalendarFeed this came from
+  eventId     String                           // local Event.id
+  lastSeen    DateTime @default(now())         // last time this UID appeared in the feed
+
+  @@unique([feedId, externalUid])
+}
