@@ -70,10 +70,12 @@ export default async function ContactsPage() {
             {contacts.map((contact) => (
               <tr key={contact.id} className="hover:bg-zinc-50/50 transition-colors">
                 <td className="px-6 py-3">
-                  <p className="text-sm font-medium text-zinc-900">
-                    {contact.firstName} {contact.lastName}
-                  </p>
-                  <p className="text-xs text-muted">{contact.email}</p>
+                  <a href={`/contacts/${contact.id}`} className="block">
+                    <p className="text-sm font-medium text-zinc-900">
+                      {contact.firstName} {contact.lastName}
+                    </p>
+                    <p className="text-xs text-muted">{contact.email}</p>
+                  </a>
                 </td>
                 <td className="px-6 py-3 text-sm text-zinc-700">{contact.company || "—"}</td>
                 <td className="px-6 py-3 text-sm text-zinc-700">{contact.role || "—"}</td>
